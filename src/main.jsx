@@ -57,15 +57,24 @@ function App() {
     addLog('CONFIG', 'Configuration saved locally')
   }
 
-  const connectDevice = () => {
+  const connectDevice = () => new Promise((resolve, reject) => {
     if (!wsUrl || !deviceKey.trim()) {
       addLog('ERROR', 'API URL and device key are required for device connection', false)
       setDeviceStatus('error')
+      reject(new Error('API URL and device key are required'))
       return
     }
     clearTimeout(reconnectTimer.current)
     socket.current?.close()
     setDeviceStatus('connecting')
+
+    let settled = false
+    const finish = (ok, error) => {
+      if (settled) return
+      settled = true
+      if (ok) resolve()
+      else reject(error || new Error('device connection failed'))
+    }
 
     try {
       const ws = new WebSocket(wsUrl)
@@ -80,6 +89,7 @@ function App() {
           if (message.type === 'authenticated') {
             setDeviceStatus('authenticated')
             addLog('DEVICE', `Authenticated as machine #${message.machine_id} · ${message.machine}`)
+            finish(true)
             return
           }
           if (message.type === 'reading_accepted') {
@@ -100,25 +110,31 @@ function App() {
             addLog('SAFETY', 'Shutdown acknowledgement sent to MAINTAIN AI')
             return
           }
-          if (message.type === 'error') addLog('DEVICE ERROR', message.message || 'Device channel error', false)
+          if (message.type === 'error') {
+            addLog('DEVICE ERROR', message.message || 'Device channel error', false)
+            finish(false, new Error(message.message || 'device authentication failed'))
+          }
         } catch {
           addLog('ERROR', 'Received invalid device message', false)
         }
       }
       ws.onerror = () => {
         setDeviceStatus('error')
-        addLog('DEVICE ERROR', 'WebSocket connection failed', false)
+        addLog('DEVICE ERROR', 'WebSocket connection failed. Check the MAINTAIN AI API URL and deployment WebSocket support.', false)
+        finish(false, new Error('WebSocket connection failed'))
       }
       ws.onclose = () => {
         if (socket.current === ws) socket.current = null
-        if (deviceStatus !== 'authenticated') setDeviceStatus('disconnected')
+        setDeviceStatus(prev => prev === 'authenticated' ? 'disconnected' : prev)
+        if (!settled) finish(false, new Error('Device WebSocket closed before authentication'))
         addLog('DEVICE', 'Device WebSocket disconnected', false)
       }
     } catch (error) {
       setDeviceStatus('error')
       addLog('DEVICE ERROR', error.message, false)
+      finish(false, error)
     }
-  }
+  })
 
   const sendReading = async (readingType, value, unit) => {
     if (shutdownLatched) {
@@ -144,7 +160,9 @@ function App() {
       }
     }
 
-    // REST remains a compatibility fallback, matching older devices.
+    // REST remains a compatibility fallback for older devices. It is only used
+    // when the device WebSocket is not authenticated, so startup does not race
+    // the WebSocket handshake.
     try {
       const response = await fetch(`${normalizedApi}/api/devices/ingest`, {
         method: 'POST',
@@ -197,16 +215,22 @@ function App() {
     return () => clearTimeout(timer.current)
   }, [running, values, interval, shutdownLatched])
 
-  const start = () => {
+  const start = async () => {
     saveSettings()
     if (shutdownLatched) {
       addLog('SAFETY', 'Reset the simulated device before starting after shutdown.', false)
       return
     }
-    connectDevice()
-    setRunning(true)
-    addLog('SYSTEM', `Simulation started · device channel · every ${interval / 1000}s`)
-    sendCycle(values)
+    try {
+      await connectDevice()
+      setRunning(true)
+      addLog('SYSTEM', `Simulation started · authenticated device channel · every ${interval / 1000}s`)
+      await sendCycle(values)
+    } catch {
+      setRunning(false)
+      setStatus('error')
+      addLog('SYSTEM', 'Simulation did not start because the device channel could not authenticate.', false)
+    }
   }
 
   const stop = () => {
@@ -216,12 +240,14 @@ function App() {
     addLog('SYSTEM', 'Simulation stopped')
   }
 
-  const resetDevice = () => {
+  const resetDevice = async () => {
     setShutdownLatched(false)
     setValues(initialValues())
     setStatus('idle')
     addLog('SAFETY', 'Simulated relay/output reset — device ready')
-    if (deviceStatus !== 'authenticated') connectDevice()
+    if (deviceStatus !== 'authenticated') {
+      try { await connectDevice() } catch {}
+    }
   }
 
   const preset = name => {
