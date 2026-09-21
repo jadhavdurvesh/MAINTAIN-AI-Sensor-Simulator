@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { Activity, Cpu, Gauge, Play, Square, RotateCcw, Send, Wifi, WifiOff, Thermometer, Droplets, Waves, Zap, CheckCircle2, XCircle, Settings2, ShieldAlert, ShieldCheck } from 'lucide-react'
+import { Activity, Cpu, Gauge, Play, Square, RotateCcw, Send, Wifi, WifiOff, Thermometer, Droplets, Waves, Zap, CheckCircle2, XCircle, Settings2, ShieldAlert, ShieldCheck, Cog, Power, CircleGauge, RotateCw } from 'lucide-react'
 import './style.css'
 
 const DEFAULT_API = ''
@@ -290,6 +290,15 @@ function App() {
         <div className="hero-actions"><button className="btn ghost" onClick={resetDevice}><RotateCcw size={16}/> Reset Device</button>{running ? <button className="btn danger" onClick={stop}><Square size={16}/> Stop Simulation</button> : <button className="btn primary" onClick={start}><Play size={16}/> Start Device</button>}</div>
       </section>
 
+      <section className={`machine-stage panel ${shutdownLatched ? 'machine-off' : running ? 'machine-running' : 'machine-idle'}`}>
+        <div className="machine-stage-head"><div><div className="panel-title"><Cog size={17}/> Machine Simulation</div><p>Live visual state of the virtual machine driven by the authenticated device channel.</p></div><div className="machine-state"><span className="machine-state-dot"/><b>{shutdownLatched ? 'SAFETY OFF' : running ? 'MACHINE RUNNING' : 'MACHINE STOPPED'}</b><span>{deviceStatus === 'authenticated' ? 'DEVICE LINKED' : 'DEVICE OFFLINE'}</span></div></div>
+        <div className="machine-visual">
+          <div className="machine-cabinet"><div className="cabinet-label"><span>MAINTAIN AI</span><small>VIRTUAL DRIVE UNIT</small></div><div className="status-lamps"><i className="lamp power"/><i className="lamp link"/><i className={`lamp fault ${shutdownLatched ? 'active' : ''}`}/></div><div className="machine-face"><div className="rotor-wrap"><div className="rotor"><span/><span/><span/><span/></div><div className="rotor-hub"><Power size={18}/></div></div><div className="machine-bars"><i/><i/><i/><i/><i/></div></div></div>
+          <div className="drive-line"><div className="belt"><span/><span/><span/></div><div className="drive-wheel"><div className="wheel-core"/><div className="wheel-spokes"><i/><i/><i/><i/></div></div></div>
+          <div className="machine-metrics"><div><span>STATE</span><strong>{shutdownLatched ? 'OFF' : running ? 'RUN' : 'IDLE'}</strong></div><div><span>LOAD</span><strong>{Math.round(clamp(values.current * 6.2, 0, 100))}%</strong></div><div><span>SPEED</span><strong>{running && !shutdownLatched ? `${Math.round(900 + values.current * 42)} RPM` : '0 RPM'}</strong></div><div><span>HEALTH</span><strong>{shutdownLatched ? 'LOCKED' : values.temperature >= 65 || values.vibration >= 2.2 ? 'CRITICAL' : values.temperature >= 45 || values.vibration >= 0.8 ? 'ATTENTION' : 'NORMAL'}</strong></div></div>
+        </div>
+        <div className="machine-footer"><span><CircleGauge size={14}/> Telemetry-linked mechanical model</span><span><RotateCw size={14}/> {running && !shutdownLatched ? 'Rotating / transmitting' : shutdownLatched ? 'Output latched off' : 'Ready to start'}</span></div>
+      </section>
       <section className="grid settings-grid">
         <div className="panel settings"><div className="panel-title"><Settings2 size={17}/> Device Connection</div>
           <label>MAINTAIN AI API URL<input value={apiUrl} onChange={e => setApiUrl(e.target.value)} placeholder="https://your-api.vercel.app" /></label>
