@@ -148,7 +148,7 @@ function App() {
     }
 
     const payload = { type: 'reading', reading_type: readingType, value: Number(value.toFixed(2)), unit }
-    if (socket.current?.readyState === WebSocket.OPEN && deviceStatus === 'authenticated') {
+    if (socket.current?.readyState === WebSocket.OPEN) {
       try {
         socket.current.send(JSON.stringify(payload))
         addLog(readingType.toUpperCase(), `${value.toFixed(2)} ${unit} → device channel`, true)
