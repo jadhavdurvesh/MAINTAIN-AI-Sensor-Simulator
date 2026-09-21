@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { Activity, Cpu, Gauge, Play, Square, RotateCcw, Send, Wifi, WifiOff, Thermometer, Droplets, Waves, Zap, CheckCircle2, XCircle, Settings2 } from 'lucide-react'
 import './style.css'
 
-const DEFAULT_API = 'https://maintain-ai-3.vercel.app'
+const DEFAULT_API = ''
 const DEFAULT_KEY = ''
 const clamp = (n, min, max) => Math.min(max, Math.max(min, n))
 const noise = amount => (Math.random() * 2 - 1) * amount
@@ -19,7 +19,6 @@ const initialValues = () => ({ ...PRESETS.normal })
 function App() {
   const [apiUrl, setApiUrl] = useState(() => localStorage.getItem('mai_sim_api') || DEFAULT_API)
   const [deviceKey, setDeviceKey] = useState(() => localStorage.getItem('mai_sim_key') || DEFAULT_KEY)
-  const [machine, setMachine] = useState(() => localStorage.getItem('mai_sim_machine') || 'motor')
   const [interval, setIntervalMs] = useState(5000)
   const [values, setValues] = useState(initialValues)
   const [running, setRunning] = useState(false)
@@ -39,7 +38,6 @@ function App() {
   const saveSettings = () => {
     localStorage.setItem('mai_sim_api', apiUrl.trim())
     localStorage.setItem('mai_sim_key', deviceKey.trim())
-    localStorage.setItem('mai_sim_machine', machine.trim() || 'motor')
     addLog('CONFIG', 'Configuration saved locally')
   }
 
@@ -147,11 +145,11 @@ function App() {
         <div className="panel settings"><div className="panel-title"><Settings2 size={17}/> Connection</div>
           <label>MAINTAIN AI API URL<input value={apiUrl} onChange={e => setApiUrl(e.target.value)} placeholder="https://your-api.vercel.app" /></label>
           <label>Device Key<input value={deviceKey} onChange={e => setDeviceKey(e.target.value)} placeholder="Paste machine IoT device key" /></label>
-          <div className="two"><label>Machine<input value={machine} onChange={e => setMachine(e.target.value)} placeholder="motor" /></label><label>Send interval<select value={interval} onChange={e => setIntervalMs(Number(e.target.value))}><option value="1000">1 second</option><option value="5000">5 seconds</option><option value="10000">10 seconds</option><option value="30000">30 seconds</option></select></label></div>
+          <div className="two"><label>Mode<input value="Machine device-key" readOnly /></label><label>Send interval<select value={interval} onChange={e => setIntervalMs(Number(e.target.value))}><option value="1000">1 second</option><option value="5000">5 seconds</option><option value="10000">10 seconds</option><option value="30000">30 seconds</option></select></label></div>
           <button className="btn ghost wide" onClick={saveSettings}><CheckCircle2 size={16}/> Save locally</button>
-          <small>Credentials are kept in this browser's local storage and are never included in the repository.</small>
+          <small>The device key is stored only in this browser and are never included in the repository.</small>
         </div>
-        <div className="panel presets"><div className="panel-title"><Gauge size={17}/> Fault Profiles</div><p>Load a realistic operating condition. While running, the new profile is sent immediately.</p><div className="preset-buttons"><button onClick={() => preset('normal')} className="normal">Normal</button><button onClick={() => preset('warning')} className="warning">Warning</button><button onClick={() => preset('critical')} className="critical">Critical</button></div><div className="status-box"><span className="pulse"/>{running ? `Streaming to ${machine || 'motor'}` : 'Ready to simulate'}<b>{lastSent ? `Last sent ${lastSent.toLocaleTimeString()}` : 'No readings sent yet'}</b></div></div>
+        <div className="panel presets"><div className="panel-title"><Gauge size={17}/> Fault Profiles</div><p>Load a realistic operating condition. While running, the new profile is sent immediately.</p><div className="preset-buttons"><button onClick={() => preset('normal')} className="normal">Normal</button><button onClick={() => preset('warning')} className="warning">Warning</button><button onClick={() => preset('critical')} className="critical">Critical</button></div><div className="status-box"><span className="pulse"/>{running ? `Streaming to connected machine` : 'Ready to simulate'}<b>{lastSent ? `Last sent ${lastSent.toLocaleTimeString()}` : 'No readings sent yet'}</b></div></div>
       </section>
 
       <section className="panel readings"><div className="panel-head"><div><div className="panel-title">Sensor Controls</div><p>Adjust values manually or use a fault profile. Running mode adds small random variation every cycle.</p></div><span className="live-pill"><span/> LIVE DATA</span></div><div className="sensor-grid">
