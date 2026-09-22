@@ -196,8 +196,17 @@ function App() {
       ['vibration', next.vibration, 'g'],
       ['current', next.current, 'A']
     ]
-    for (const [type, value, unit] of readings) await sendReading(type, value, unit)
-    if (!shutdownLatched) setStatus('connected')
+    let allSent = true
+    for (const [type, value, unit] of readings) {
+      const sent = await sendReading(type, value, unit)
+      if (!sent) allSent = false
+    }
+    if (allSent && !shutdownLatched) setStatus('connected')
+    if (!allSent) {
+      runningRef.current = false
+      clearTimeout(timer.current)
+      setRunning(false)
+    }
   }
 
   const tick = async () => {
