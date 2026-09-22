@@ -25,6 +25,7 @@ function App() {
   const [status, setStatus] = useState('idle')
   const [deviceStatus, setDeviceStatus] = useState('disconnected')
   const [shutdownLatched, setShutdownLatched] = useState(false)
+  const [shutdownInfo, setShutdownInfo] = useState(null)
   const [lastSent, setLastSent] = useState(null)
   const [logs, setLogs] = useState([])
   const timer = useRef(null)
@@ -108,6 +109,7 @@ function App() {
           }
           if (message.type === 'shutdown' || message.type === 'shutdown_test') {
             setShutdownLatched(true)
+            setShutdownInfo({ type: message.type, reason: message.reason || 'Safety limit crossed', value: message.value, threshold: message.threshold, readingType: message.reading_type })
             setRunning(false)
             clearTimeout(timer.current)
             setStatus('shutdown')
@@ -261,6 +263,7 @@ function App() {
 
   const resetDevice = async () => {
     setShutdownLatched(false)
+    setShutdownInfo(null)
     setValues(initialValues())
     setStatus('idle')
     addLog('SAFETY', 'Simulated relay/output reset — device ready')
@@ -317,6 +320,12 @@ function App() {
           <div className="machine-metrics"><div><span>STATE</span><strong>{shutdownLatched ? 'OFF' : running ? 'RUN' : 'IDLE'}</strong></div><div><span>LOAD</span><strong>{Math.round(clamp(values.current * 6.2, 0, 100))}%</strong></div><div><span>SPEED</span><strong>{running && !shutdownLatched ? `${Math.round(900 + values.current * 42)} RPM` : '0 RPM'}</strong></div><div><span>HEALTH</span><strong>{shutdownLatched ? 'LOCKED' : values.temperature >= 65 || values.vibration >= 2.2 ? 'CRITICAL' : values.temperature >= 45 || values.vibration >= 0.8 ? 'ATTENTION' : 'NORMAL'}</strong></div></div>
         </div>
         <div className="machine-footer"><span><CircleGauge size={14}/> Telemetry-linked mechanical model</span><span><RotateCw size={14}/> {running && !shutdownLatched ? 'Rotating / transmitting' : shutdownLatched ? 'Output latched off' : 'Ready to start'}</span></div>
+        {shutdownLatched && shutdownInfo && <div style={{marginTop:12,padding:12,borderRadius:10,border:'1px solid rgba(255,90,90,.45)',background:'rgba(255,70,70,.08)',color:'#ffb2ad',fontSize:12}}>
+          <strong>SAFETY SHUTDOWN · DEVICE OUTPUT OFF</strong>
+          <div style={{marginTop:5}}>{shutdownInfo.reason}</div>
+          {shutdownInfo.value != null && shutdownInfo.threshold != null && <div style={{marginTop:4}}>Measured: <b>{Number(shutdownInfo.value).toFixed(2)} {shutdownInfo.readingType === 'temperature' ? '°C' : shutdownInfo.readingType === 'vibration' ? 'g' : shutdownInfo.readingType === 'current' ? 'A' : '%'}</b> · Limit: <b>{Number(shutdownInfo.threshold).toFixed(2)} {shutdownInfo.readingType === 'temperature' ? '°C' : shutdownInfo.readingType === 'vibration' ? 'g' : shutdownInfo.readingType === 'current' ? 'A' : '%'}</b></div>}
+          <div style={{marginTop:4}}>✓ Shutdown acknowledgement sent to MAINTAIN AI</div>
+        </div>}
       </section>
       <section className="grid settings-grid">
         <div className="panel settings"><div className="panel-title"><Settings2 size={17}/> Device Connection</div>
