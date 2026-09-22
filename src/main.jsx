@@ -30,6 +30,9 @@ function App() {
   const timer = useRef(null)
   const socket = useRef(null)
   const reconnectTimer = useRef(null)
+  const runningRef = useRef(false)
+  const shutdownRef = useRef(false)
+  const intentionalCloseRef = useRef(false)
 
   const normalizedApi = useMemo(() => apiUrl.trim().replace(/\/$/, ''), [apiUrl])
   const wsUrl = useMemo(() => {
@@ -40,6 +43,11 @@ function App() {
     url.search = ''
     return url.toString()
   }, [normalizedApi])
+
+  useEffect(() => {
+    runningRef.current = running
+    shutdownRef.current = shutdownLatched
+  }, [running, shutdownLatched])
 
   useEffect(() => () => {
     clearTimeout(timer.current)
@@ -65,7 +73,9 @@ function App() {
       return
     }
     clearTimeout(reconnectTimer.current)
+    intentionalCloseRef.current = true
     socket.current?.close()
+    intentionalCloseRef.current = false
     setDeviceStatus('connecting')
 
     let settled = false
@@ -128,6 +138,13 @@ function App() {
         setDeviceStatus(prev => prev === 'authenticated' ? 'disconnected' : prev)
         if (!settled) finish(false, new Error('Device WebSocket closed before authentication'))
         addLog('DEVICE', 'Device WebSocket disconnected', false)
+        if (!intentionalCloseRef.current && runningRef.current && !shutdownRef.current) {
+          addLog('DEVICE', 'Reconnecting device channel in 2 seconds…', false)
+          clearTimeout(reconnectTimer.current)
+          reconnectTimer.current = setTimeout(() => {
+            connectDevice().catch(() => {})
+          }, 2000)
+        }
       }
     } catch (error) {
       setDeviceStatus('error')
@@ -216,6 +233,7 @@ function App() {
   }, [running, values, interval, shutdownLatched])
 
   const start = async () => {
+    runningRef.current = true
     saveSettings()
     if (shutdownLatched) {
       addLog('SAFETY', 'Reset the simulated device before starting after shutdown.', false)
@@ -227,6 +245,7 @@ function App() {
       addLog('SYSTEM', `Simulation started · authenticated device channel · every ${interval / 1000}s`)
       await sendCycle(values)
     } catch {
+      runningRef.current = false
       setRunning(false)
       setStatus('error')
       addLog('SYSTEM', 'Simulation did not start because the device channel could not authenticate.', false)
@@ -234,10 +253,13 @@ function App() {
   }
 
   const stop = () => {
+    runningRef.current = false
+    intentionalCloseRef.current = true
     setRunning(false)
     clearTimeout(timer.current)
     setStatus('idle')
     addLog('SYSTEM', 'Simulation stopped')
+    intentionalCloseRef.current = false
   }
 
   const resetDevice = async () => {
