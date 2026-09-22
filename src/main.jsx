@@ -138,7 +138,12 @@ function App() {
         setDeviceStatus(prev => prev === 'authenticated' ? 'disconnected' : prev)
         if (!settled) finish(false, new Error('Device WebSocket closed before authentication'))
         addLog('DEVICE', 'Device WebSocket disconnected', false)
-        if (!intentionalCloseRef.current && runningRef.current && !shutdownRef.current) {
+        if (!intentionalCloseRef.current && !shutdownRef.current) {
+          runningRef.current = false
+          clearTimeout(timer.current)
+          setRunning(false)
+          setStatus('device_offline')
+          addLog('SAFETY', 'Device safety channel lost — machine output stopped until the channel reconnects.', false)
           addLog('DEVICE', 'Reconnecting device channel in 2 seconds…', false)
           clearTimeout(reconnectTimer.current)
           reconnectTimer.current = setTimeout(() => {
@@ -177,26 +182,9 @@ function App() {
       }
     }
 
-    // REST remains a compatibility fallback for older devices. It is only used
-    // when the device WebSocket is not authenticated, so startup does not race
-    // the WebSocket handshake.
-    try {
-      const response = await fetch(`${normalizedApi}/api/devices/ingest`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Device-Key': deviceKey.trim() },
-        body: JSON.stringify({ reading_type: readingType, value: Number(value.toFixed(2)), unit })
-      })
-      const text = await response.text()
-      if (!response.ok) throw new Error(`HTTP ${response.status}${text ? ` · ${text.slice(0, 140)}` : ''}`)
-      addLog(readingType.toUpperCase(), `${value.toFixed(2)} ${unit} → REST accepted`, true)
-      setLastSent(new Date())
-      setStatus('connected')
-      return true
-    } catch (error) {
-      addLog('ERROR', `${readingType}: ${error.message}`, false)
-      setStatus('error')
-      return false
-    }
+    setStatus('device_offline')
+    addLog('SAFETY', 'Telemetry blocked because the device WebSocket is offline. Reconnect the safety channel before running the machine.', false)
+    return false
   }
 
   const sendCycle = async (next = values) => {
