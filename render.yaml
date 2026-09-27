@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: maintain-ai-cloud-simulator
+    runtime: python
+    plan: starter
+    region: singapore
+    buildCommand: pip install -r requirements-worker.txt
+    startCommand: python cloud_worker.py
+    autoDeploy: true
+    envVars:
+      - key: SIMULATOR_API_URL
+        sync: false
+      - key: SIMULATOR_DEVICE_KEYS
+        sync: false
+      - key: SIMULATOR_INTERVAL_SECONDS
+        value: "5"
